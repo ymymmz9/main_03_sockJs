@@ -1,0 +1,26 @@
+.container {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.chat_container {
+  width: 300px;
+  height: 500px;
+}
+
+.chat {
+  width: 100%;
+  height: 90%;
+  background-color: #eee;
+  overflow: hidden auto;
+}
+
+.input_container {
+  width: 100%;
+  height: 10%;
+  display: flex;
+}
+
+.input_container > input {
+  flex: 1 0 0;
+}
