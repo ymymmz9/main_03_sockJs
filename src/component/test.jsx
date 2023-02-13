@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
-import SockJS from "sockjs-client";
-// import StompJS from "stompjs";
+import { useState, useEffect, useRef } from "react";
+import * as SockJS from "sockjs-client";
 import * as StompJs from "@stomp/stompjs";
+// import { Client } from "@stomp/stompjs";
 import axios from "axios";
 import "./test.css";
 
@@ -11,83 +11,92 @@ const Test = () => {
   const [currentRoomId, setCurrentRoomId] = useState(0);
   const [createRoomId, setCreateRoomId] = useState("");
   const [changeRoomId, setChangeRoomId] = useState("");
-  // const [profileId, setProfileId] = useState(1);
-  const [ws, setWs] = useState(null);
 
   const initialChatSetting = async () => {
     await axios
       .get(`/chats/message/${currentRoomId}`)
-      .then(({ data: { chatResponses } }) => setMessages(chatResponses));
+      .then(({ data: { chatResponses } }) => setMessages(chatResponses))
+  }
+
+  const client = useRef({});
+  const URL =
+    "http://ec2-15-165-186-53.ap-northeast-2.compute.amazonaws.com:8081/stomp/content";
+
+  useEffect(() => {
+    console.log('useEffect')
+    initialChatSetting();
+    connect();
+    return () => disconnect();
+  }, [currentRoomId]);
+
+  const connect = () => {
+    client.current = new StompJs.Client({
+      webSocketFactory: () => new SockJS(URL),
+      connectHeaders: {
+        token: "token",
+      },
+      debug: function (str) {
+        console.log(str);
+      },
+      reconnectDelay: 5000,
+      heartbeatIncoming: 4000,
+      heartbeatOutgoing: 4000,
+      onConnect: () => {
+        subscribe();
+      },
+      onStompError: (frame) => {
+        console.error(frame);
+      },
+    });
+
+    client.current.activate();
   };
 
-  const setWebSocket = async () => {
-    try {
-      await ws.connect("", () => {
-        ws.subscribe(`/sub/room/${currentRoomId}`, async (msg) => {
-          console.log(msg);
-          // setMessages([...messages, JSON.parse(msg.body)]);
-          //구독한 location에서 메시지를 수신했을 때 처리해주고자 하는 동작
-        });
-      });
-    } catch (error) {
-      console.log(error);
+  const disconnect = () => {
+    client.current.deactivate();
+  };
+
+  const subscribe = () => {
+    client.current.subscribe(`/sub/room/${currentRoomId}`, (res) => {
+      setMessages([...messages, JSON.parse(res.body)]);
+      console.log(res.body);
+      console.log("subscribe");
+    });
+  };
+
+  const publish = (message) => {
+    if (!client.current.connected) {
+      return;
     }
-  };
 
-  const sendMsg = async () => {
-    try {
-      ws.send(`/pub/chats/message/${currentRoomId}`, "", {
+    client.current.publish({
+      destination: `/pub/chats/message/${currentRoomId}`,
+      body: JSON.stringify({
         senderId: 1,
         receiverId: 2,
         content: text,
-      });
-    } catch (error) {
-      console.log(error);
-    }
+      }),
+    });
+    console.log("해치웠나?");
+    console.log("publish");
+    setText("");
   };
 
   const inputHandler = (e) => {
     setText(e.target.value);
   };
 
-  const disconnectWebSocket = () => {
-    ws.disconnect(() => {
-      ws.unsubscribe();
-    });
-  };
-
-  useEffect(() => {
-    if (currentRoomId === 0) return;
-
-    if (ws !== null) {
-      initialChatSetting();
-      setWebSocket();
-    } else {
-      const sockjs = new SockJS(
-        `http://ec2-15-165-186-53.ap-northeast-2.compute.amazonaws.com:8081/stomp/content`
-      );
-      const client = StompJs.Client(sockjs);
-      setWs(client);
-    }
-
-    return () => {
-      ws.disconnect(() => {
-        ws.unsubscribe();
-      });
-    };
-  }, [currentRoomId]);
-
   return (
     <div className="container">
       <div className="chat_container">
         <div className="chat">
           {messages.map((el) => {
-            return <div>{el.content}</div>;
+            return <div>{el.content ? el.content : el.message}</div>;
           })}
         </div>
         <div className="input_container">
           <input onChange={inputHandler} value={text} />
-          <button onClick={sendMsg}>send</button>
+          <button onClick={publish}>send</button>
         </div>
       </div>
       <div className="setRoom_container">
@@ -115,8 +124,9 @@ const Test = () => {
         </button>
         <>createRoomId: {createRoomId}</>
       </div>
-      {/* <button onClick={setWebSocket}>웹소켓 연결</button> */}
-      <button onClick={disconnectWebSocket}>연결 끊기</button>
+
+      <button onClick={connect}>웹소켓 연결하기</button>
+      <button onClick={disconnect}>연결 끊기</button>
     </div>
   );
 };
