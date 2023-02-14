@@ -23,7 +23,6 @@ const Test = () => {
     "http://ec2-15-165-186-53.ap-northeast-2.compute.amazonaws.com:8081/stomp/content";
 
   useEffect(() => {
-    console.log('useEffect')
     initialChatSetting();
     connect();
     return () => disconnect();
@@ -35,9 +34,7 @@ const Test = () => {
       connectHeaders: {
         token: "token",
       },
-      debug: function (str) {
-        console.log(str);
-      },
+      debug: () => {},
       reconnectDelay: 5000,
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,
@@ -58,9 +55,7 @@ const Test = () => {
 
   const subscribe = () => {
     client.current.subscribe(`/sub/room/${currentRoomId}`, (res) => {
-      setMessages([...messages, JSON.parse(res.body)]);
-      console.log(res.body);
-      console.log("subscribe");
+      setMessages(prev => [...prev, JSON.parse(res.body)]);
     });
   };
 
@@ -77,8 +72,6 @@ const Test = () => {
         content: text,
       }),
     });
-    console.log("해치웠나?");
-    console.log("publish");
     setText("");
   };
 
@@ -90,8 +83,8 @@ const Test = () => {
     <div className="container">
       <div className="chat_container">
         <div className="chat">
-          {messages.map((el) => {
-            return <div>{el.content ? el.content : el.message}</div>;
+          {messages.map((el, idx) => {
+            return <div key={idx}>{el.content ? el.content : el.message}</div>;
           })}
         </div>
         <div className="input_container">
